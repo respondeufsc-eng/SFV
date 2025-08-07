@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerar Planilha - Segunda Vida</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Estrutura de decisão para módulos fotovoltaico de segunda vida</h1>
+
+        <h2>Gerar Planilha de Análise</h2>
+        <form method="get" action="/generate_excel">
+            <label for="quantity">Quantidade de módulos:</label>
+            <input type="number" id="quantity" name="quantity" value="1" min="1" required>
+            <button type="submit">Gerar Planilha</button>
+        </form>
+
+        <hr>
+
+        <p>Ou envie uma planilha preenchida para análise:</p>
+        <a href="{{ url_for('upload') }}"><button>Ir para Upload</button></a>
+    </div>
+</body>
+</html>

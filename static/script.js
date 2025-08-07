@@ -109,3 +109,10 @@ function secondLife() {
     const resultDiv = document.getElementById('result');
     resultDiv.innerHTML = `<p>Resultado: <strong>Disponível para Segunda Vida (SL)</strong> 🌱</p>`;
 }
+
+function generateExcel() {
+    const quantity = document.getElementById('quantity').value;
+    const url = `/generate_excel?quantity=${quantity}`;
+    window.location.href = url;
+}
+
