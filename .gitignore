@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# Flask session files
+flask_session/
+
+# Temporary uploads
+temp_uploads/
+
+# Generated report files
+Resultados_Analise_*.xlsx
+Relatorio_Analise_FV_*.pdf
+
+# Generated batch files
+RUN_NOVO.bat
+
+# Environment variables
+.env
+*.env
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

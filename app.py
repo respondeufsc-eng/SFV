@@ -17,13 +17,34 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics import renderPDF
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from datetime import datetime
 import numpy as np
 import math
 import json
 import traceback
 import warnings
+import os
 warnings.filterwarnings('ignore')
+
+_pdf_fonts_registered = False
+
+def _register_pdf_fonts():
+    global _pdf_fonts_registered
+    if _pdf_fonts_registered:
+        return
+    fonts_dir = os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts')
+    try:
+        pdfmetrics.registerFont(TTFont('Arial', os.path.join(fonts_dir, 'arial.ttf')))
+        pdfmetrics.registerFont(TTFont('Arial-Bold', os.path.join(fonts_dir, 'arialbd.ttf')))
+        pdfmetrics.registerFont(TTFont('Arial-Italic', os.path.join(fonts_dir, 'ariali.ttf')))
+        pdfmetrics.registerFont(TTFont('Arial-BoldItalic', os.path.join(fonts_dir, 'arialbi.ttf')))
+        from reportlab.pdfbase.pdfmetrics import registerFontFamily
+        registerFontFamily('Arial', normal='Arial', bold='Arial-Bold', italic='Arial-Italic', boldItalic='Arial-BoldItalic')
+        _pdf_fonts_registered = True
+    except Exception as e:
+        print(f'Aviso: Nao foi possivel registrar fontes Arial: {e}')
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = 'segredo_ultra_seguro_2025'
@@ -671,14 +692,16 @@ def avaliar_modulo_conforme_artigo(row, etapas_detalhadas):
 
 # Função para gerar relatório PDF completo
 def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_data):
+    _register_pdf_fonts()
+
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, 
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
                            rightMargin=1.5*cm, leftMargin=1.5*cm,
                            topMargin=2*cm, bottomMargin=2*cm)
-    
+
     elements = []
     styles = getSampleStyleSheet()
-    
+
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Title'],
@@ -686,52 +709,62 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         spaceAfter=25,
         alignment=1,
         textColor=colors.HexColor('#2C3E50'),
-        fontName='Helvetica-Bold'
+        fontName='Arial-Bold'
     )
-    
+
     subtitle_style = ParagraphStyle(
         'Subtitle',
         parent=styles['Heading2'],
         fontSize=14,
         spaceAfter=12,
         textColor=colors.HexColor('#3498DB'),
-        fontName='Helvetica-Bold',
+        fontName='Arial-Bold',
         spaceBefore=20
     )
-    
+
     section_style = ParagraphStyle(
         'Section',
         parent=styles['Heading3'],
         fontSize=12,
         spaceAfter=8,
         textColor=colors.HexColor('#2C3E50'),
-        fontName='Helvetica-Bold',
+        fontName='Arial-Bold',
         spaceBefore=15
     )
-    
+
     normal_style = ParagraphStyle(
         'Normal',
         parent=styles['Normal'],
         fontSize=10,
+        fontName='Arial',
         spaceAfter=6,
         leading=14
     )
-    
+
     highlight_style = ParagraphStyle(
         'Highlight',
         parent=styles['Normal'],
         fontSize=10,
+        fontName='Arial',
         spaceAfter=6,
         backColor=colors.HexColor('#F8F9FA'),
         borderPadding=5,
         borderColor=colors.HexColor('#DEE2E6'),
         borderWidth=1
     )
+
+    italic_style = ParagraphStyle(
+        'ItalicArial',
+        parent=styles['Normal'],
+        fontSize=10,
+        fontName='Arial-Italic',
+        spaceAfter=4
+    )
     
     elements.append(Paragraph("<b>RELATÓRIO DE ANÁLISE TÉCNICA</b>", title_style))
     elements.append(Paragraph("<b>Módulos Fotovoltaicos - Segunda Vida</b>", subtitle_style))
-    elements.append(Paragraph("<i>Conforme artigo científico: 'Circular solar economy: PV modules decision-making framework for reuse'</i>", styles['Italic']))
-    elements.append(Paragraph("<i>Journal of Cleaner Production, 2023</i>", styles['Italic']))
+    elements.append(Paragraph("<i>Conforme artigo científico: 'Circular solar economy: PV modules decision-making framework for reuse'</i>", italic_style))
+    elements.append(Paragraph("<i>Journal of Cleaner Production, 2023</i>", italic_style))
     elements.append(Spacer(1, 20))
     
     data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -773,7 +806,7 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2C3E50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
         ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#E8F8F5')),
@@ -785,8 +818,37 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
     ]))
     
     elements.append(resumo_table)
-    elements.append(Spacer(1, 25))
-    
+    elements.append(Spacer(1, 20))
+
+    # Pie chart — distribuição de classificação
+    elements.append(Paragraph("<b>DISTRIBUIÇÃO DE CLASSIFICAÇÃO</b>", subtitle_style))
+    pie_entries = [
+        (estatisticas['classe_a'],   'Classe A',   colors.HexColor('#27AE60')),
+        (estatisticas['classe_b'],   'Classe B',   colors.HexColor('#F39C12')),
+        (estatisticas['reciclagem'], 'Reciclagem', colors.HexColor('#E74C3C')),
+        (estatisticas['manutencao'], 'Manutencao', colors.HexColor('#3498DB')),
+    ]
+    pie_data   = [c for c, _, _ in pie_entries if c > 0]
+    pie_labels = [f"{lbl}: {c/estatisticas['total_modulos']*100:.1f}%" for c, lbl, _ in pie_entries if c > 0]
+    pie_colors = [col for c, _, col in pie_entries if c > 0]
+    if len(pie_data) > 1:
+        drawing = Drawing(400, 190)
+        pie = Pie()
+        pie.x, pie.y = 80, 20
+        pie.width = pie.height = 150
+        pie.data   = pie_data
+        pie.labels = pie_labels
+        pie.slices.labelRadius = 1.25
+        pie.slices.fontName    = 'Arial'
+        pie.slices.fontSize    = 8
+        pie.slices.strokeWidth = 0.5
+        pie.slices.strokeColor = colors.white
+        for i, col in enumerate(pie_colors):
+            pie.slices[i].fillColor = col
+        drawing.add(pie)
+        elements.append(drawing)
+    elements.append(Spacer(1, 15))
+
     elements.append(Paragraph("<b>COMPARAÇÃO COM ARTIGO CIENTÍFICO</b>", subtitle_style))
     
     comparacao_text = f"""
@@ -820,7 +882,7 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('SPAN', (0, 1), (0, 3)),
         ('SPAN', (0, 4), (0, 6)),
@@ -837,7 +899,7 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
     etapas_data = [
         ["ETAPA", "APROVADOS", "REPROVADOS", "MANUTENÇÃO"],
         ["Inspeção Visual", f"{etapas_stats['visual']['pass']}%", f"{etapas_stats['visual']['fail']}%", f"{etapas_stats['visual'].get('maintenance', 0)}%"],
-        ["Teste de Resistência", f"{etapas_stats['n_curve']['pass']}%", f"{etapas_stats['n_curve']['fail']}%", "0%"],
+        ["Resistência + Curva IV", f"{etapas_stats['n_curve']['pass']}%", f"{etapas_stats['n_curve']['fail']}%", "0%"],
         ["Eletroluminescência", f"{etapas_stats['el']['pass']}%", f"{etapas_stats['el']['fail']}%", "0%"]
     ]
     
@@ -846,7 +908,7 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2C3E50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#D5F4E6')),
         ('BACKGROUND', (0, 2), (0, 2), colors.HexColor('#FFE5CC')),
@@ -889,7 +951,7 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#95A5A6')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
             ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
         ]))
@@ -917,13 +979,14 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
     Desenvolvido com base em artigo científico revisado por pares<br/>
     Referência: Pivatto et al. (2023). Circular solar economy: PV modules decision-making framework for reuse<br/>
     Journal of Cleaner Production<br/>
-    Relatório gerado em {data_atual} | Página 1/1
+    Relatório gerado em {data_atual}
     """
-    
+
     elements.append(Paragraph(rodape_text, ParagraphStyle(
         'Rodape',
         parent=styles['Normal'],
         fontSize=8,
+        fontName='Arial',
         textColor=colors.grey,
         alignment=1,
         spaceBefore=20
