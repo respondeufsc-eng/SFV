@@ -66,8 +66,7 @@
         }
         
         .waterfall-bar-container {
-            margin-bottom: 2.5rem;
-            position: relative;
+            margin-bottom: 1.5rem;
         }
         
         .waterfall-label {
@@ -109,39 +108,34 @@
             transform: translateX(100%);
         }
         
-        .bar-value {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            color: white;
-            font-weight: bold;
-            padding: 0 10px;
-            font-size: 0.9rem;
+        .bar-labels {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-left: 180px;
+            margin-top: 5px;
+            font-size: 0.82rem;
+            min-height: 20px;
         }
-        
-        .pass-bar .bar-value {
-            right: 10px;
-        }
-        
-        .fail-bar .bar-value {
-            left: 10px;
-        }
-        
-        .waterfall-quantity {
-            position: absolute;
-            right: 0;
-            top: 45px;
-            font-size: 0.85rem;
+
+        .bar-label-pass {
             color: #27AE60;
             font-weight: bold;
+            white-space: nowrap;
         }
-        
-        .waterfall-quantity-fail {
-            position: absolute;
-            right: 0;
-            top: 65px;
-            font-size: 0.85rem;
+
+        .bar-label-counts {
+            color: #555;
+            font-size: 0.78rem;
+            text-align: center;
+            flex: 1;
+            padding: 0 8px;
+        }
+
+        .bar-label-fail {
             color: #E74C3C;
+            font-weight: bold;
+            white-space: nowrap;
         }
         
         .chart-legend {
@@ -301,8 +295,6 @@
                         {% elif i == 2 %}
                             <span class="stage-indicator resistance-indicator"></span>
                         {% elif i == 3 %}
-                            <span class="stage-indicator el-indicator"></span>
-                        {% else %}
                             <span class="stage-indicator" style="background-color: #2ECC71;"></span>
                         {% endif %}
                         {{ graph_data.labels[i] }}
@@ -311,54 +303,64 @@
                     <div class="waterfall-bar-wrapper">
                         <!-- Barra positiva (Pass) -->
                         {% if graph_data.pass_values[i] > 0 %}
-                        <div class="waterfall-bar pass-bar" 
+                        <div class="waterfall-bar pass-bar"
                              style="width: {{ graph_data.pass_values[i] }}%">
-                            <span class="bar-value">
-                                {% if i == 0 %}
-                                    100%
-                                {% else %}
-                                    {{ graph_data.pass_values[i] }}%
-                                {% endif %}
-                            </span>
                         </div>
                         {% endif %}
-                        
+
                         <!-- Barra negativa (Fail) -->
                         {% if graph_data.fail_values[i] < 0 %}
-                        <div class="waterfall-bar fail-bar" 
+                        <div class="waterfall-bar fail-bar"
                              style="width: {{ -graph_data.fail_values[i] }}%">
-                            <span class="bar-value">{{ graph_data.fail_values[i] }}%</span>
                         </div>
                         {% endif %}
                     </div>
-                    
-                    <!-- Quantidades -->
-                    {% if i == 0 %}
-                    <div class="waterfall-quantity">{{ graph_data.quantidades.total }} módulos</div>
-                    {% elif i == 1 %}
-                    <div class="waterfall-quantity">{{ graph_data.quantidades.vi_pass }} aprovados</div>
-                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.vi_fail }} reprovados</div>
-                    {% elif i == 2 %}
-                    <div class="waterfall-quantity">{{ graph_data.quantidades.n_curve_pass }} aprovados</div>
-                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.n_curve_fail }} reprovados</div>
-                    {% elif i == 3 %}
-                    <div class="waterfall-quantity">{{ graph_data.quantidades.el_pass }} aprovados</div>
-                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.el_fail }} reprovados</div>
-                    {% elif i == 4 %}
-                    <div class="waterfall-quantity">{{ graph_data.quantidades.total_pass }} aprovados totais</div>
-                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.total - graph_data.quantidades.total_pass }} reprovados totais</div>
-                    {% endif %}
+
+                    <!-- Rótulos abaixo das barras -->
+                    <div class="bar-labels">
+                        <!-- Percentagem: esquerda -->
+                        {% if graph_data.pass_values[i] > 0 %}
+                        <span class="bar-label-pass">
+                            {% if i == 0 %}100%{% else %}{{ graph_data.pass_values[i] }}%{% endif %}
+                        </span>
+                        {% else %}
+                        <span></span>
+                        {% endif %}
+
+                        <!-- Contagens: centro -->
+                        <span class="bar-label-counts">
+                            {% if i == 0 %}
+                                {{ graph_data.quantidades.total }} módulos
+                            {% elif i == 1 %}
+                                {{ graph_data.quantidades.vi_pass }} aprovados
+                                {% if graph_data.quantidades.vi_fail > 0 %} · {{ graph_data.quantidades.vi_fail }} reprovados{% endif %}
+                            {% elif i == 2 %}
+                                {{ graph_data.quantidades.resistance_pass }} aprovados
+                                {% if graph_data.quantidades.resistance_fail > 0 %} · {{ graph_data.quantidades.resistance_fail }} reprovados{% endif %}
+                            {% elif i == 3 %}
+                                {{ graph_data.quantidades.iv_pass }} aprovados
+                                {% if graph_data.quantidades.iv_fail > 0 %} · {{ graph_data.quantidades.iv_fail }} reprovados{% endif %}
+                            {% endif %}
+                        </span>
+
+                        <!-- Percentagem: direita -->
+                        {% if graph_data.fail_values[i] < 0 %}
+                        <span class="bar-label-fail">{{ -graph_data.fail_values[i] }}%</span>
+                        {% else %}
+                        <span></span>
+                        {% endif %}
+                    </div>
                 </div>
                 {% endfor %}
                 
                 <div class="chart-legend">
                     <div class="legend-item">
                         <div class="legend-color pass-color"></div>
-                        <span>Módulos Aprovados na Etapa</span>
+                        <span>Módulos Aprovados (acumulado)</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color fail-color"></div>
-                        <span>Módulos Reprovados na Etapa</span>
+                        <span>Módulos Descartados (acumulado)</span>
                     </div>
                 </div>
                 

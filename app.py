@@ -26,7 +26,21 @@ import json
 import traceback
 import warnings
 import os
+import re
 warnings.filterwarnings('ignore')
+
+_UNSUPPORTED_CHARS_RE = re.compile(
+    u'['
+    u'\U00010000-\U0010FFFF'   # Non-BMP: 🔧 and other emoji
+    u'\U00002600-\U000027BF'   # Misc Symbols + Dingbats: ✅ ♻ ⚠
+    u'\U0000FE00-\U0000FE0F'   # Variation selectors (e.g. the invisible ️ after ♻)
+    u']',
+    re.UNICODE
+)
+
+def _pdf_text(text):
+    """Strip characters Arial cannot render (shows as □ in PDF)."""
+    return _UNSUPPORTED_CHARS_RE.sub('', str(text)).strip()
 
 _pdf_fonts_registered = False
 
@@ -567,16 +581,16 @@ def avaliar_modulo_conforme_artigo(row, etapas_detalhadas):
         # - ≥ 60 MΩ·m²: EXCELENTE (Classe A possível)
         
         if resistencia_fabricante < 40:
-            etapas_detalhadas['n_curve']['fail'] += 1
+            etapas_detalhadas['resistance']['fail'] += 1
             return f"Reciclagem ♻️ (Resistência {resistencia_fabricante:.1f} MΩ·m² < 40 MΩ·m² - Conforme artigo)"
-        
+
         # Armazenar status da resistência para decisão final
         status_resistencia = "A" if resistencia_fabricante >= 60 else "B"
-        etapas_detalhadas['n_curve']['pass'] += 1
-            
+        etapas_detalhadas['resistance']['pass'] += 1
+
     except Exception as e:
         print(f"ERRO no cálculo de resistência: {e}")
-        etapas_detalhadas['n_curve']['fail'] += 1
+        etapas_detalhadas['resistance']['fail'] += 1
         return "Reciclagem ♻️ (Erro nos dados de resistência)"
     
     # ==================== 4. TESTE CURVA IV ====================
@@ -760,6 +774,15 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         fontName='Arial-Italic',
         spaceAfter=4
     )
+
+    cell_style = ParagraphStyle(
+        'TableCell',
+        parent=styles['Normal'],
+        fontName='Arial',
+        fontSize=9,
+        leading=12,
+        wordWrap='LTR'
+    )
     
     elements.append(Paragraph("<b>RELATÓRIO DE ANÁLISE TÉCNICA</b>", title_style))
     elements.append(Paragraph("<b>Módulos Fotovoltaicos - Segunda Vida</b>", subtitle_style))
@@ -801,18 +824,21 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         ["TOTAL", f"{estatisticas['total_modulos']}", "100%", ""]
     ]
     
-    resumo_table = Table(resumo_data, colWidths=[3.5*cm, 2.5*cm, 2.5*cm, 6*cm])
+    resumo_table = Table(resumo_data, colWidths=[3.5*cm, 2.5*cm, 2.5*cm, 9.5*cm])
     resumo_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2C3E50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Arial'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#E8F8F5')),
-        ('BACKGROUND', (0, 2), (0, 2), colors.HexColor('#FEF9E7')),
-        ('BACKGROUND', (0, 3), (0, 3), colors.HexColor('#FDEDEC')),
-        ('BACKGROUND', (0, 4), (0, 4), colors.HexColor('#EBF5FB')),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#E8F8F5')),
+        ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#FEF9E7')),
+        ('BACKGROUND', (0, 3), (-1, 3), colors.HexColor('#FDEDEC')),
+        ('BACKGROUND', (0, 4), (-1, 4), colors.HexColor('#EBF5FB')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
@@ -864,31 +890,42 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
     
     elements.append(Paragraph("<b>CRITÉRIOS TÉCNICOS APLICADOS</b>", subtitle_style))
     
+    def cv(text):
+        return Paragraph(text, cell_style)
+
     criterios_data = [
         ["ETAPA", "CRITÉRIO", "REFERÊNCIA", "VALOR"],
-        ["Inspeção Visual", "Vidro quebrado", "Artigo p.5-6", "Reciclagem imediata"],
-        ["", "Danos reparáveis", "Artigo p.5-6", "Manutenção"],
-        ["", "Danos irreparáveis", "Artigo p.5-6", "Reciclagem"],
-        ["Resistência Isolamento", "Mínimo aceitável", "IEC 61215-2 / Artigo p.6", "40 MΩ·m²"],
-        ["Teste Curva IV", "Idade conhecida (1% deg/anual)", "Artigo p.6", "≥ (Esperada - 10%)"],
-        ["", "Idade desconhecida", "Artigo p.6", "≥ 60% original"],
-        ["", "Classificação A/B", "Artigo p.6-7", "Baseada em potência"],
-        ["Eletroluminescência", "Rachaduras", "IEC TS 60904-13", "Reciclagem"],
-        ["", ">50% células danificadas", "Artigo p.7", "Reciclagem"]
+        ["Inspeção Visual", "Vidro quebrado", "Artigo p.5-6", cv("Reciclagem imediata")],
+        ["", "Danos reparáveis", "Artigo p.5-6", cv("Manutenção")],
+        ["", "Danos irreparáveis", "Artigo p.5-6", cv("Reciclagem")],
+        ["Resistência Isolamento", "Mínimo aceitável", "IEC 61215-2 / Artigo p.6", cv("40 MΩ·m²")],
+        ["Teste Curva IV", "Idade conhecida (1% deg/anual)", "Artigo p.6", cv("≥ (Esperada - 10%)")],
+        ["", "Idade desconhecida", "Artigo p.6", cv("≥ 60% original")],
+        ["", "Classificação A/B", "Artigo p.6-7", cv("Baseada em potência")],
+        ["Eletroluminescência", "Rachaduras", "IEC TS 60904-13", cv("Reciclagem")],
+        ["", ">50% células danificadas", "Artigo p.7", cv("Reciclagem")]
     ]
     
-    criterios_table = Table(criterios_data, colWidths=[4*cm, 5*cm, 3.5*cm, 3*cm])
+    criterios_table = Table(criterios_data, colWidths=[4.5*cm, 6*cm, 4.5*cm, 3*cm])
     criterios_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Arial'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('SPAN', (0, 1), (0, 3)),
-        ('SPAN', (0, 4), (0, 6)),
-        ('SPAN', (0, 7), (0, 8)),
-        ('BACKGROUND', (0, 4), (0, 4), colors.HexColor('#E8F6F3')),
-        ('BACKGROUND', (0, 7), (0, 7), colors.HexColor('#FDEDEC')),
+        ('SPAN', (0, 5), (0, 7)),
+        ('SPAN', (0, 8), (0, 9)),
+        ('BACKGROUND', (0, 1), (-1, 3), colors.HexColor('#FEF9E7')),
+        ('BACKGROUND', (0, 4), (-1, 4), colors.HexColor('#E8F6F3')),
+        ('BACKGROUND', (0, 5), (-1, 7), colors.HexColor('#E8F6F3')),
+        ('BACKGROUND', (0, 8), (-1, 9), colors.HexColor('#FDEDEC')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
     elements.append(criterios_table)
@@ -903,16 +940,22 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
         ["Eletroluminescência", f"{etapas_stats['el']['pass']}%", f"{etapas_stats['el']['fail']}%", "0%"]
     ]
     
-    etapas_table = Table(etapas_data, colWidths=[5*cm, 3*cm, 3*cm, 3*cm])
+    etapas_table = Table(etapas_data, colWidths=[7*cm, 3.5*cm, 3.5*cm, 4*cm])
     etapas_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2C3E50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Arial'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#D5F4E6')),
-        ('BACKGROUND', (0, 2), (0, 2), colors.HexColor('#FFE5CC')),
-        ('BACKGROUND', (0, 3), (0, 3), colors.HexColor('#D6EAF8')),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#D5F4E6')),
+        ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#FFE5CC')),
+        ('BACKGROUND', (0, 3), (-1, 3), colors.HexColor('#D6EAF8')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
     elements.append(etapas_table)
@@ -932,30 +975,35 @@ def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_
     elements.append(Paragraph(fluxo_text, normal_style))
     elements.append(Spacer(1, 25))
     
-    elements.append(Paragraph("<b>AMOSTRA DE RESULTADOS</b>", subtitle_style))
-    
+    elements.append(Paragraph("<b>RESULTADOS COMPLETOS</b>", subtitle_style))
+
     if resultados_lista:
-        amostra = resultados_lista[:20]
         detalhes_data = [["ID do Módulo", "Resultado da Análise"]]
-        
-        for item in amostra:
+
+        for item in resultados_lista:
             if '➝' in item:
-                parts = item.split('➝')
-                detalhes_data.append([parts[0].strip(), parts[1].strip()])
-        
-        if len(resultados_lista) > 20:
-            detalhes_data.append(["...", f"+ {len(resultados_lista)-20} mais módulos"])
-        
-        detalhes_table = Table(detalhes_data, colWidths=[4*cm, 10*cm])
+                parts = item.split('➝', 1)
+                detalhes_data.append([
+                    _pdf_text(parts[0]),
+                    Paragraph(_pdf_text(parts[1]), cell_style)
+                ])
+
+        detalhes_table = Table(detalhes_data, colWidths=[3.5*cm, 14.5*cm], repeatRows=1)
         detalhes_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#95A5A6')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Arial'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F2F3F4')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
-        
+
         elements.append(detalhes_table)
         elements.append(Spacer(1, 25))
     
@@ -1181,6 +1229,7 @@ def upload():
                 
                 etapas_detalhadas = {
                     'visual': {'pass': 0, 'fail': 0, 'maintenance': 0},
+                    'resistance': {'pass': 0, 'fail': 0},
                     'n_curve': {'pass': 0, 'fail': 0},
                     'el': {'pass': 0, 'fail': 0}
                 }
@@ -1255,48 +1304,49 @@ def upload():
                         etapas_stats[etapa] = {'pass': 0, 'fail': 0, 'maintenance': 0}
                 
                 total_pass = classe_a + classe_b
-                
-                vi_pass = etapas_detalhadas['visual']['pass'] + etapas_detalhadas['visual'].get('maintenance', 0)
-                n_curve_pass = etapas_detalhadas['n_curve']['pass']
-                
-                vi_pass_pct = (vi_pass / total_modulos * 100) if total_modulos > 0 else 0
-                n_curve_pass_pct = (n_curve_pass / total_modulos * 100) if total_modulos > 0 else 0
-                total_pass_pct = (total_pass / total_modulos * 100) if total_modulos > 0 else 0
-                
-                vi_fail_pct = 100 - vi_pass_pct
-                n_curve_fail_pct = vi_pass_pct - n_curve_pass_pct
-                other_fail_pct = n_curve_pass_pct - total_pass_pct
-                
+
+                vi_pass         = etapas_detalhadas['visual']['pass'] + etapas_detalhadas['visual'].get('maintenance', 0)
+                resistance_pass = etapas_detalhadas['resistance']['pass']
+                iv_pass         = etapas_detalhadas['n_curve']['pass']   # passes both resistance + IV curve = total_pass
+
+                t = total_modulos if total_modulos > 0 else 1
+                vi_pass_pct         = vi_pass         / t * 100
+                resistance_pass_pct = resistance_pass / t * 100
+                iv_pass_pct         = total_pass      / t * 100   # use total_pass (classe A+B) as ground truth
+
+                vi_fail_pct         = 100              - vi_pass_pct
+                resistance_fail_pct = vi_pass_pct      - resistance_pass_pct
+                iv_fail_pct         = resistance_pass_pct - iv_pass_pct
+
                 graph_data = {
                     'labels': [
                         'Total Descomissionado',
-                        'Inspeção Visual', 
-                        'Teste de Resistência', 
-                        'Teste de Potência', 
-                        'Aprovados Segunda Vida'
+                        'Inspeção Visual',
+                        'Teste de Resistência',
+                        'Curva IV / Potência'
                     ],
                     'pass_values': [
-                        round(100, 1),
-                        round(vi_pass_pct, 1),
-                        round(n_curve_pass_pct, 1),
-                        round(total_pass_pct, 1),
-                        round(total_pass_pct, 1)
+                        round(100,                 1),
+                        round(vi_pass_pct,         1),
+                        round(resistance_pass_pct, 1),
+                        round(iv_pass_pct,         1),
                     ],
+                    # fail = cumulative discard so that green + red = 100% on every bar
                     'fail_values': [
                         0,
-                        round(-vi_fail_pct, 1),
-                        round(-n_curve_fail_pct, 1),
-                        round(-other_fail_pct, 1),
-                        0
+                        round(-(100 - vi_pass_pct),         1),
+                        round(-(100 - resistance_pass_pct), 1),
+                        round(-(100 - iv_pass_pct),         1),
                     ],
                     'quantidades': {
-                        'total': total_modulos,
-                        'vi_pass': vi_pass,
-                        'n_curve_pass': n_curve_pass,
-                        'total_pass': total_pass,
-                        'vi_fail': total_modulos - vi_pass,
-                        'n_curve_fail': vi_pass - n_curve_pass,
-                        'other_fail': n_curve_pass - total_pass
+                        'total':            total_modulos,
+                        'vi_pass':          vi_pass,
+                        'vi_fail':          total_modulos - vi_pass,
+                        'resistance_pass':  resistance_pass,
+                        'resistance_fail':  vi_pass - resistance_pass,
+                        'iv_pass':          total_pass,
+                        'iv_fail':          resistance_pass - total_pass,
+                        'total_pass':       total_pass,
                     }
                 }
                 
@@ -1429,6 +1479,7 @@ def api_analyze():
         
         etapas_detalhadas = {
             'visual': {'pass': 0, 'fail': 0, 'maintenance': 0},
+            'resistance': {'pass': 0, 'fail': 0},
             'n_curve': {'pass': 0, 'fail': 0},
             'el': {'pass': 0, 'fail': 0}
         }
