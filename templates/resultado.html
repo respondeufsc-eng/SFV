@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados da Análise - Sistema FV</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .header {
+            background: linear-gradient(135deg, #2C3E50 0%, #3498DB 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 10px 10px;
+        }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-card {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .classe-a {
+            background-color: #E8F8F5;
+            border-left: 4px solid #27AE60;
+        }
+        .classe-b {
+            background-color: #FEF9E7;
+            border-left: 4px solid #F39C12;
+        }
+        .reciclagem {
+            background-color: #FDEDEC;
+            border-left: 4px solid #E74C3C;
+        }
+        .manutencao {
+            background-color: #EBF5FB;
+            border-left: 4px solid #3498DB;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        /* Estilos para o gráfico de cascata */
+        .waterfall-chart {
+            margin: 2rem 0;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .waterfall-bar-container {
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+        
+        .waterfall-label {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #2C3E50;
+            font-size: 1.1rem;
+            min-width: 180px;
+            display: inline-block;
+        }
+        
+        .waterfall-bar-wrapper {
+            position: relative;
+            height: 40px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-left: 180px;
+        }
+        
+        .waterfall-bar {
+            height: 100%;
+            position: absolute;
+            top: 0;
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+        
+        .pass-bar {
+            background: linear-gradient(90deg, #27AE60, #2ECC71);
+            left: 0;
+            z-index: 2;
+        }
+        
+        .fail-bar {
+            background: linear-gradient(90deg, #E74C3C, #EC7063);
+            right: 0;
+            z-index: 1;
+            transform: translateX(100%);
+        }
+        
+        .bar-value {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-weight: bold;
+            padding: 0 10px;
+            font-size: 0.9rem;
+        }
+        
+        .pass-bar .bar-value {
+            right: 10px;
+        }
+        
+        .fail-bar .bar-value {
+            left: 10px;
+        }
+        
+        .waterfall-quantity {
+            position: absolute;
+            right: 0;
+            top: 45px;
+            font-size: 0.85rem;
+            color: #27AE60;
+            font-weight: bold;
+        }
+        
+        .waterfall-quantity-fail {
+            position: absolute;
+            right: 0;
+            top: 65px;
+            font-size: 0.85rem;
+            color: #E74C3C;
+        }
+        
+        .chart-legend {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .pass-color {
+            background: #27AE60;
+        }
+        
+        .fail-color {
+            background: #E74C3C;
+        }
+        
+        .result-item {
+            padding: 0.75rem;
+            border-left: 4px solid #ddd;
+            margin-bottom: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .classe-a-item {
+            border-left-color: #27AE60;
+            background-color: #E8F8F5;
+        }
+        
+        .classe-b-item {
+            border-left-color: #F39C12;
+            background-color: #FEF9E7;
+        }
+        
+        .reciclagem-item {
+            border-left-color: #E74C3C;
+            background-color: #FDEDEC;
+        }
+        
+        .manutencao-item {
+            border-left-color: #3498DB;
+            background-color: #EBF5FB;
+        }
+        
+        .download-buttons {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 1rem;
+            border-top: 1px solid #ddd;
+            z-index: 1000;
+        }
+        
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .chart-note {
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        
+        .stage-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .visual-indicator { background-color: #27AE60; }
+        .resistance-indicator { background-color: #F39C12; }
+        .el-indicator { background-color: #3498DB; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1 class="display-5">📊 Resultados da Análise Técnica</h1>
+            <p class="lead">Módulos Fotovoltaicos - Sistema de Segunda Vida</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Resumo Geral -->
+        <div class="section">
+            <h3>📈 Resumo da Análise</h3>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stat-card classe-a">
+                        <div class="stat-number">{{ estatisticas.classe_a }}</div>
+                        <div class="stat-label">Classe A</div>
+                        <small>{{ estatisticas.percent_classe_a }}%</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card classe-b">
+                        <div class="stat-number">{{ estatisticas.classe_b }}</div>
+                        <div class="stat-label">Classe B</div>
+                        <small>{{ estatisticas.percent_classe_b }}%</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card reciclagem">
+                        <div class="stat-number">{{ estatisticas.reciclagem }}</div>
+                        <div class="stat-label">Reciclagem</div>
+                        <small>{{ estatisticas.percent_reciclagem }}%</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card manutencao">
+                        <div class="stat-number">{{ estatisticas.manutencao }}</div>
+                        <div class="stat-label">Manutenção</div>
+                        <small>{{ estatisticas.percent_manutencao }}%</small>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-info mt-3">
+                <strong>Taxa de Reuso Total: {{ (estatisticas.percent_classe_a + estatisticas.percent_classe_b)|round(1) }}%</strong> 
+                dos módulos podem ser reaproveitados para segunda vida.
+            </div>
+        </div>
+        
+        <!-- Gráfico de Cascata -->
+        <div class="section">
+            <h3>📊 Filtro de Módulos por Etapa de Teste</h3>
+            <p class="text-muted">Visualização da redução progressiva dos módulos conforme passam pelos diferentes testes de qualidade.</p>
+            
+            <div class="waterfall-chart">
+                {% for i in range(graph_data.labels|length) %}
+                <div class="waterfall-bar-container">
+                    <div class="waterfall-label">
+                        {% if i == 0 %}
+                            <span class="stage-indicator" style="background-color: #95A5A6;"></span>
+                        {% elif i == 1 %}
+                            <span class="stage-indicator visual-indicator"></span>
+                        {% elif i == 2 %}
+                            <span class="stage-indicator resistance-indicator"></span>
+                        {% elif i == 3 %}
+                            <span class="stage-indicator el-indicator"></span>
+                        {% else %}
+                            <span class="stage-indicator" style="background-color: #2ECC71;"></span>
+                        {% endif %}
+                        {{ graph_data.labels[i] }}
+                    </div>
+                    
+                    <div class="waterfall-bar-wrapper">
+                        <!-- Barra positiva (Pass) -->
+                        {% if graph_data.pass_values[i] > 0 %}
+                        <div class="waterfall-bar pass-bar" 
+                             style="width: {{ graph_data.pass_values[i] }}%">
+                            <span class="bar-value">
+                                {% if i == 0 %}
+                                    100%
+                                {% else %}
+                                    {{ graph_data.pass_values[i] }}%
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Barra negativa (Fail) -->
+                        {% if graph_data.fail_values[i] < 0 %}
+                        <div class="waterfall-bar fail-bar" 
+                             style="width: {{ -graph_data.fail_values[i] }}%">
+                            <span class="bar-value">{{ graph_data.fail_values[i] }}%</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Quantidades -->
+                    {% if i == 0 %}
+                    <div class="waterfall-quantity">{{ graph_data.quantidades.total }} módulos</div>
+                    {% elif i == 1 %}
+                    <div class="waterfall-quantity">{{ graph_data.quantidades.vi_pass }} aprovados</div>
+                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.vi_fail }} reprovados</div>
+                    {% elif i == 2 %}
+                    <div class="waterfall-quantity">{{ graph_data.quantidades.n_curve_pass }} aprovados</div>
+                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.n_curve_fail }} reprovados</div>
+                    {% elif i == 3 %}
+                    <div class="waterfall-quantity">{{ graph_data.quantidades.el_pass }} aprovados</div>
+                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.el_fail }} reprovados</div>
+                    {% elif i == 4 %}
+                    <div class="waterfall-quantity">{{ graph_data.quantidades.total_pass }} aprovados totais</div>
+                    <div class="waterfall-quantity-fail">{{ graph_data.quantidades.total - graph_data.quantidades.total_pass }} reprovados totais</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <div class="legend-color pass-color"></div>
+                        <span>Módulos Aprovados na Etapa</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color fail-color"></div>
+                        <span>Módulos Reprovados na Etapa</span>
+                    </div>
+                </div>
+                
+                <p class="chart-note">O gráfico mostra como a quantidade de módulos vai diminuindo conforme são filtrados pelos testes de qualidade.</p>
+            </div>
+        </div>
+        
+        <!-- Análise por Etapa -->
+        <div class="section">
+            <h3>🔍 Análise por Etapa de Teste</h3>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">👁️ Inspeção Visual</h5>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-success" style="width: {{ etapas_stats.visual.pass }}%">
+                                    {{ etapas_stats.visual.pass }}%
+                                </div>
+                            </div>
+                            <p class="card-text">
+                                <strong>Aprovados:</strong> {{ etapas_stats.visual.pass }}%<br>
+                                <strong>Reprovados:</strong> {{ etapas_stats.visual.fail }}%
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">⚡ Teste de Resistência</h5>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-warning" style="width: {{ etapas_stats.n_curve.pass }}%">
+                                    {{ etapas_stats.n_curve.pass }}%
+                                </div>
+                            </div>
+                            <p class="card-text">
+                                <strong>Aprovados:</strong> {{ etapas_stats.n_curve.pass }}%<br>
+                                <strong>Reprovados:</strong> {{ etapas_stats.n_curve.fail }}%
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">💡 Eletroluminescência</h5>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-info" style="width: {{ etapas_stats.el.pass }}%">
+                                    {{ etapas_stats.el.pass }}%
+                                </div>
+                            </div>
+                            <p class="card-text">
+                                <strong>Aprovados:</strong> {{ etapas_stats.el.pass }}%<br>
+                                <strong>Reprovados:</strong> {{ etapas_stats.el.fail }}%
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lista de Resultados -->
+        <div class="section">
+            <h3>📋 Resultados Individuais dos Módulos</h3>
+            <p>Total de módulos analisados: <strong>{{ total_modulos }}</strong></p>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID do Módulo</th>
+                            <th>Resultado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resultado in resultados %}
+                        <tr>
+                            {% if '➝' in resultado %}
+                                {% set parts = resultado.split('➝') %}
+                                <td>{{ parts[0].strip() }}</td>
+                                <td>
+                                    {% if 'Classe A' in parts[1] %}
+                                        <span class="badge bg-success">Classe A</span>
+                                    {% elif 'Classe B' in parts[1] %}
+                                        <span class="badge bg-warning">Classe B</span>
+                                    {% elif 'Reciclagem' in parts[1] %}
+                                        <span class="badge bg-danger">Reciclagem</span>
+                                    {% elif 'Manutenção' in parts[1] %}
+                                        <span class="badge bg-info">Manutenção</span>
+                                    {% endif %}
+                                    {{ parts[1].strip() }}
+                                </td>
+                            {% else %}
+                                <td colspan="2">{{ resultado }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Botões de Download -->
+        <div class="download-buttons">
+            <div class="row">
+                <div class="col-md-6">
+                    <form action="/download_excel" method="POST">
+                        <button type="submit" class="btn btn-success w-100">
+                            📥 Baixar Resultados em Excel
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <form action="/download_pdf" method="POST">
+                        <button type="submit" class="btn btn-primary w-100">
+                            📄 Baixar Relatório em PDF
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="text-center mt-3">
+                <a href="/upload" class="btn btn-outline-secondary">⬅️ Nova Análise</a>
+                <a href="/" class="btn btn-outline-primary">🏠 Página Inicial</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Animar barras do gráfico
+        document.addEventListener('DOMContentLoaded', function() {
+            const bars = document.querySelectorAll('.waterfall-bar');
+            bars.forEach(bar => {
+                const originalWidth = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = originalWidth;
+                }, 100);
+            });
+        });
+    </script>
+</body>
+</html>

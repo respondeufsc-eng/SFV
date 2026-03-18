@@ -1,20 +1,119 @@
+:root {
+  --primary: #2d9cdb;   /* Azul principal */
+  --primary-dark: #1b7bbf;
+  --dark: #222222;      /* Preto */
+  --gray: #555555;      /* Cinza */
+  --light: #f7f9fc;     /* Fundo suave */
+  --white: #ffffff;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    padding: 30px;
-    background-color: #f2f2f2;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--light);
+  color: var(--dark);
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+}
+
+header {
+  background: linear-gradient(135deg, var(--primary), #4a6491);
+  color: var(--white);
+  padding: 25px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .container {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    max-width: 700px;
-    margin: auto;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  max-width: 1200px;
+  margin: 40px auto;
+  background: var(--white);
+  padding: 40px;
+  border-radius: 15px;
+  box-shadow: 0px 8px 25px rgba(0,0,0,0.08);
 }
 
-input, button {
-    padding: 10px;
-    margin: 10px 0;
-    font-size: 1rem;
+h1 {
+  color: var(--dark);
+  margin-bottom: 25px;
+  font-size: 28px;
+  text-align: center;
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 15px;
+}
+
+h2 {
+  margin-top: 30px;
+  font-size: 22px;
+  color: var(--dark);
+  border-left: 5px solid var(--primary);
+  padding-left: 15px;
+  margin-bottom: 20px;
+}
+
+form {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+}
+
+label {
+  font-weight: 600;
+  color: var(--dark);
+}
+
+input[type="number"],
+input[type="file"] {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  flex: 1;
+  transition: border 0.3s;
+}
+
+input[type="number"]:focus,
+input[type="file"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(45, 156, 219, 0.2);
+}
+
+button {
+  background: linear-gradient(to right, var(--primary), var(--primary-dark));
+  color: var(--white);
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(45, 156, 219, 0.3);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(45, 156, 219, 0.4);
+}
+
+hr {
+  margin: 40px 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, #ddd, transparent);
+}
+
+footer {
+  text-align: center;
+  margin: 40px 0 20px;
+  font-size: 14px;
+  color: var(--gray);
+  padding: 20px;
+  border-top: 1px solid #eee;
 }
