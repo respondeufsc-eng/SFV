@@ -483,191 +483,95 @@ def calcular_potencia_esperada_conforme_artigo(ano_fabricacao, idade_conhecida=T
 
 # Função principal de avaliação conforme artigo - VERSÃO CORRIGIDA
 def avaliar_modulo_conforme_artigo(row, etapas_detalhadas):
-    """Avalia módulo conforme critérios do artigo científico - VERSÃO CORRIGIDA"""
+    """Avalia módulo conforme critérios do artigo científico - LÓGICA MATEMÁTICA EXATA"""
     
-    # ==================== 1. FALHAS CRÍTICAS (RECICLAGEM IMEDIATA) ====================
-    
-    # 1.1. VIDRO QUEBRADO - CRÍTICO
-    vidro_quebrado = str(row.get("Vidro Quebrado/Rachado?", "")).strip().upper()
-    if vidro_quebrado == "SIM":
+    # ==================== 1. INSPEÇÃO VISUAL ====================
+    if str(row.get("Vidro Quebrado/Rachado?", "")).strip().upper() == "SIM":
         etapas_detalhadas['visual']['fail'] += 1
-        return "Reciclagem ♻️ (Vidro quebrado - Conforme artigo)"
-    
-    # 1.2. ELETROLUMINESCÊNCIA COM FALHAS - CRÍTICO
-    el_realizado = str(row.get("Foi realizado Eletroluminescência?", "")).strip().upper()
-    if el_realizado == "SIM":
-        rachaduras = str(row.get("Rachaduras Detectadas?", "")).strip().upper()
-        celulas_danificadas = str(row.get(">50% Células Danificadas?", "")).strip().upper()
+        return "Reciclagem ♻️ (Vidro quebrado)"
         
-        if rachaduras == "SIM" or celulas_danificadas == "SIM":
-            etapas_detalhadas['el']['fail'] += 1
-            return "Reciclagem ♻️ (Falha em eletroluminescência - Conforme artigo)"
-        else:
-            etapas_detalhadas['el']['pass'] += 1
-    
-    # ==================== 2. DANOS VISUAIS ====================
-    
     danos_visuais = (
         str(row.get("Backsheet Danificado?", "")).strip().upper() == "SIM" or 
         str(row.get("Junction Box Danificado?", "")).strip().upper() == "SIM" or 
         str(row.get("Cabos/Conectores Danificados?", "")).strip().upper() == "SIM"
     )
     
-    defeito_reparavel = str(row.get("Defeito Reparável?", "")).strip().upper()
-    
     if danos_visuais:
-        if defeito_reparavel == "SIM":
+        reparavel = str(row.get("Defeito Reparável?", "")).strip().upper()
+        if reparavel == "SIM":
             etapas_detalhadas['visual']['maintenance'] += 1
-            return "Manutenção 🔧 (Danos reparáveis - Conforme artigo)"
         else:
             etapas_detalhadas['visual']['fail'] += 1
-            return "Reciclagem ♻️ (Danos não reparáveis - Conforme artigo)"
+            return "Reciclagem ♻️ (Danos visuais não reparáveis)"
     else:
         etapas_detalhadas['visual']['pass'] += 1
-    
-    # ==================== 3. RESISTÊNCIA DE ISOLAMENTO ====================
-    
-    try:
-        resistencia_fabricante = converter_numero(row.get("Resistência Ôhmica Fabricante (MΩ·m²)", 0))
+
+    # ==================== 2. RESISTÊNCIA DE ISOLAMENTO ====================
+    riso = converter_numero(row.get("Resistência Ôhmica Fabricante (MΩ·m²)", 0))
+    if riso <= 0:
+        h = converter_numero(row.get("Altura (m)", 0))
+        w = converter_numero(row.get("Largura (m)", 0))
+        r1 = converter_numero(row.get("Resistência Medida 1 min (MΩ)", 0))
+        r2 = converter_numero(row.get("Resistência Medida 2 min (MΩ)", 0))
         
-        # Calcular se não estiver disponível
-        if resistencia_fabricante <= 0:
-            altura = converter_numero(row.get("Altura (m)", 0))
-            largura = converter_numero(row.get("Largura (m)", 0))
-            r1 = converter_numero(row.get("Resistência Medida 1 min (MΩ)", 0))
-            r2 = converter_numero(row.get("Resistência Medida 2 min (MΩ)", 0))
+        rmin = min(r1, r2) if (r1 > 0 and r2 > 0) else max(r1, r2)
+        if h > 0 and w > 0 and rmin > 0:
+            riso = rmin * h * w
             
-            if altura > 0 and largura > 0 and r1 > 0 and r2 > 0:
-                resistencia_fabricante = min(r1, r2) * altura * largura
-        
-        # CRITÉRIOS CONFORME ARTIGO CORRIGIDOS:
-        # - < 40 MΩ·m²: FALHA CRÍTICA (Reciclagem)
-        # - 40-60 MΩ·m²: DESEMPENHO REDUZIDO (Classe B possível)
-        # - ≥ 60 MΩ·m²: EXCELENTE (Classe A possível)
-        
-        if resistencia_fabricante < 40:
-            etapas_detalhadas['n_curve']['fail'] += 1
-            return f"Reciclagem ♻️ (Resistência {resistencia_fabricante:.1f} MΩ·m² < 40 MΩ·m² - Conforme artigo)"
-        
-        # Armazenar status da resistência para decisão final
-        status_resistencia = "A" if resistencia_fabricante >= 60 else "B"
-        etapas_detalhadas['n_curve']['pass'] += 1
-            
-    except Exception as e:
-        print(f"ERRO no cálculo de resistência: {e}")
+    if riso > 0 and riso < 40:
         etapas_detalhadas['n_curve']['fail'] += 1
-        return "Reciclagem ♻️ (Erro nos dados de resistência)"
+        return f"Reciclagem ♻️ (Isolamento {riso:.1f} < 40 MΩ·m²)"
     
-    # ==================== 4. TESTE CURVA IV ====================
-    
+    etapas_detalhadas['n_curve']['pass'] += 1
+
+    # ==================== 3. TESTE CURVA IV E CLASSIFICAÇÃO A/B ====================
+    pot_percent = converter_numero(row.get('Potência (% da original)', 0))
+    if pot_percent > 0 and pot_percent <= 1:
+        pot_percent *= 100
+        
+    if pot_percent <= 0:
+        pmax = converter_numero(row.get("Pmáx Medido (W)", 0))
+        pnom = converter_numero(row.get("Potência do datasheet (W)", 0))
+        if pnom > 0 and pmax > 0:
+            pot_percent = (pmax / pnom) * 100
+            
+    if pot_percent <= 0:
+        etapas_detalhadas['n_curve']['fail'] += 1
+        return "Reciclagem ♻️ (Erro: Sem dados de potência)"
+
     idade_conhecida = str(row.get("Idade do Módulo Conhecida?", "")).strip().upper() == "SIM"
     
-    # Calcular potência percentual CORRETAMENTE
-    try:
-        if 'Potência (% da original)' in row and pd.notna(row.get('Potência (% da original)')):
-            potencia_percent = converter_numero(row.get('Potência (% da original)', 0))
-            # Converter decimal para percentual se necessário
-            if potencia_percent <= 1:
-                potencia_percent = potencia_percent * 100
-            elif potencia_percent > 100 and potencia_percent < 1000:
-                # Já está em percentual
-                pass
-        else:
-            # Calcular manualmente
-            pmax_medido = converter_numero(row.get("Pmáx Medido (W)", 0))
-            potencia_datasheet = converter_numero(row.get("Potência do datasheet (W)", 0))
-            
-            # CORREÇÕES CRÍTICAS:
-            # 1. Se Pmáx for percentual (ex: 43.10% = 0.4310)
-            if 0 < pmax_medido < 1 and potencia_datasheet > 10:
-                pmax_medido = pmax_medido * 100  # Converter para WATTS
-            
-            # 2. Se Pmáx estiver em kW (ex: 0.146 kW)
-            if pmax_medido < 10 and potencia_datasheet > 10:
-                pmax_medido = pmax_medido * 1000  # kW para W
-            
-            if potencia_datasheet > 0:
-                potencia_percent = (pmax_medido / potencia_datasheet) * 100
-            else:
-                potencia_percent = 0
-        
-    except Exception as e:
-        print(f"ERRO no cálculo de potência: {e}")
-        potencia_percent = 0
-    
-    # ==================== 5. CLASSIFICAÇÃO CONFORME ARTIGO ====================
-    
     if idade_conhecida:
-        try:
-            ano_fabricacao = converter_numero(row.get("Ano", 0))
-            
-            # Degradação fixa de 1% ao ano conforme artigo
-            degradacao_anual = 1.0  # 1% fixo conforme artigo
-            ano_atual = datetime.now().year
-            idade = max(0, ano_atual - int(ano_fabricacao))
-            
-            # Calcular potência esperada
-            potencia_esperada = max(0, 100 - (idade * degradacao_anual))
-            minimo_aceitavel = max(0, potencia_esperada - 10)
-            
-            # VALIDAÇÃO DE DADOS
-            if potencia_esperada <= 0 or minimo_aceitavel <= 0:
-                # Fallback: usar critério idade desconhecida
-                if potencia_percent < 60:
-                    etapas_detalhadas['n_curve']['fail'] += 1
-                    return "Reciclagem ♻️ (Potência <60% - Fallback)"
-                else:
-                    status_potencia = "A" if potencia_percent >= 90 else "B"
-            else:
-                # CRITÉRIOS CONFORME ARTIGO CORRIGIDOS:
-                # - < mínimo aceitável: FALHA (Reciclagem)
-                # - ≥ mínimo mas < esperada: DESEMPENHO REDUZIDO (Classe B)
-                # - ≥ esperada: EXCELENTE (Classe A)
-                
-                if potencia_percent < minimo_aceitavel:
-                    etapas_detalhadas['n_curve']['fail'] += 1
-                    return f"Reciclagem ♻️ (Potência {potencia_percent:.1f}% < {minimo_aceitavel:.1f}% mínimo - Conforme artigo)"
-                elif potencia_percent >= potencia_esperada:
-                    status_potencia = "A"
-                else:
-                    status_potencia = "B"
-                
-                etapas_detalhadas['n_curve']['pass'] += 1
-                
-        except Exception as e:
-            print(f"ERRO no cálculo idade conhecida: {e}")
-            # Fallback: critério idade desconhecida
-            if potencia_percent < 60:
-                etapas_detalhadas['n_curve']['fail'] += 1
-                return "Reciclagem ♻️ (Potência <60% - Erro no cálculo)"
-            else:
-                status_potencia = "A" if potencia_percent >= 90 else "B"
-                etapas_detalhadas['n_curve']['pass'] += 1
-                
+        ano = converter_numero(row.get("Ano", 0))
+        idade = max(0, 2020 - int(ano)) if ano > 0 else 22 
+        esperada = max(0, 100 - idade) # Corte Classe A = 78%
+        minimo = max(0, esperada - 10) # Corte Reciclagem = 68%
     else:
-        # IDADE DESCONHECIDA - critérios fixos do artigo
-        if potencia_percent < 60:
-            etapas_detalhadas['n_curve']['fail'] += 1
-            return f"Reciclagem ♻️ (Potência {potencia_percent:.1f}% < 60% - Conforme artigo para idade desconhecida)"
-        elif potencia_percent >= 90:
-            status_potencia = "A"
-        else:
-            status_potencia = "B"
+        esperada = 90
+        minimo = 60
+
+    if pot_percent < minimo:
+        etapas_detalhadas['n_curve']['fail'] += 1
+        return f"Reciclagem ♻️ (Potência {pot_percent:.1f}% < mínimo de {minimo:.1f}%)"
         
-        etapas_detalhadas['n_curve']['pass'] += 1
+    eh_classe_a = (pot_percent >= esperada)
+
+    # ==================== 4. ELETROLUMINESCÊNCIA ====================
+    if str(row.get("Foi realizado Eletroluminescência?", "")).strip().upper() == "SIM":
+        if str(row.get("Rachaduras Detectadas?", "")).strip().upper() == "SIM" or \
+           str(row.get(">50% Células Danificadas?", "")).strip().upper() == "SIM":
+            etapas_detalhadas['el']['fail'] += 1
+            return "Reciclagem ♻️ (Reprovado na Eletroluminescência)"
+        etapas_detalhadas['el']['pass'] += 1
+
+    # ==================== 5. DECISÃO FINAL ====================
+    # Apenas aponta Manutenção no texto final se a planilha de fato possuir defeito reparável
+    texto_manu = " (Manutenção 🔧)" if str(row.get("Defeito Reparável?", "")).strip().upper() == "SIM" else ""
     
-    # ==================== 6. DECISÃO FINAL (CONFORME ARTIGO) ====================
-    
-    # CRITÉRIOS FINAIS CORRIGIDOS:
-    # 1. Se ambos resistência E potência são "A" → Classe A
-    # 2. Se pelo menos um é "B" (mas nenhum é "F") → Classe B
-    # 3. Qualquer "F" já foi tratado acima (Reciclagem)
-    
-    if status_resistencia == "A" and status_potencia == "A":
-        return f"Classe A ✅ (Excelente - Potência {potencia_percent:.1f}%, Resistência {resistencia_fabricante:.1f} MΩ·m²)"
+    if eh_classe_a:
+        return f"Classe A ✅ - Potência: {pot_percent:.1f}%, Riso: {riso:.1f}{texto_manu}"
     else:
-        # Pelo menos um é B (mas ambos passaram nos mínimos)
-        return f"Classe B ⚠️ (Aceitável - Potência {potencia_percent:.1f}%, Resistência {resistencia_fabricante:.1f} MΩ·m²)"
+        return f"Classe B ⚠️ - Potência: {pot_percent:.1f}%, Riso: {riso:.1f}{texto_manu}"
 
 # Função para gerar relatório PDF completo
 def generate_pdf_report(df, estatisticas, etapas_stats, resultados_lista, graph_data):
